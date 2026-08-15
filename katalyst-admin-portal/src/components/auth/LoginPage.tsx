@@ -15,11 +15,10 @@ import {
   WifiOff
 } from 'lucide-react';
 import { useAdmin } from '../../context/AdminContext';
-import { INITIAL_ADMIN_USERS } from '../../data/mockData';
 
 export const LoginPage: React.FC = () => {
-  const { login } = useAdmin();
-  
+  const { login, loginLoading, loginError } = useAdmin();
+
   const [email, setEmail] = useState('admin@katalystindia.org');
   const [password, setPassword] = useState('KatalystAdmin2026!');
   const [showPassword, setShowPassword] = useState(false);
@@ -29,29 +28,23 @@ export const LoginPage: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (loginState === 'invalid') {
-      return;
-    }
-    if (loginState === 'locked') {
-      return;
-    }
-    if (loginState === 'network_error') {
-      return;
-    }
+  // Sync loading/error from context
+  React.useEffect(() => {
+    if (loginLoading) setLoginState('loading');
+    else if (loginError) setLoginState('invalid');
+    else setLoginState('default');
+  }, [loginLoading, loginError]);
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginState === 'locked' || loginState === 'network_error') return;
     setLoginState('loading');
-    setTimeout(() => {
-      login(email);
-    }, 900);
+    await login(email, password);
   };
 
-  const handleSelectDemoUser = (userEmail: string, role: string) => {
+  const handleSelectDemoUser = (userEmail: string) => {
     setEmail(userEmail);
-    setPassword('Katalyst@2026');
-    setLoginState('default');
-    login(userEmail, role);
+    setPassword('KatalystAdmin2026!');
   };
 
   return (
@@ -242,32 +235,30 @@ export const LoginPage: React.FC = () => {
             </div>
           </form>
 
-          {/* Quick Demo Persona Switcher for Evaluation */}
+          {/* Quick Pre-filled Admin Credentials */}
           <div className="mt-6 pt-5 border-t border-slate-800">
             <div className="text-[11px] font-semibold text-slate-400 mb-2 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-rose-400" />
-                <span>Instant Demo Login (One-Click)</span>
+                <span>Default Admin Account</span>
               </span>
-              <span className="text-[10px] text-slate-500">Select role:</span>
+              <span className="text-[10px] text-slate-500 font-mono">Supabase Auth</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {INITIAL_ADMIN_USERS.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => handleSelectDemoUser(user.email, user.role)}
-                  className="p-2 rounded-lg bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800 text-left transition-all group"
-                >
-                  <div className="text-xs font-semibold text-white group-hover:text-rose-300 truncate">
-                    {user.name}
-                  </div>
-                  <div className="text-[10px] text-rose-400 font-mono font-medium">
-                    {user.role}
-                  </div>
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => handleSelectDemoUser('admin@katalystindia.org')}
+              className="w-full p-2.5 rounded-lg bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800 text-left transition-all group flex items-center justify-between"
+            >
+              <div>
+                <div className="text-xs font-semibold text-white group-hover:text-rose-300">
+                  admin@katalystindia.org
+                </div>
+                <div className="text-[10px] text-rose-400 font-mono font-medium">
+                  Super Administrator • Full Access
+                </div>
+              </div>
+              <span className="text-xs font-medium text-slate-400 group-hover:text-white px-2 py-1 bg-slate-800 rounded">Auto-fill</span>
+            </button>
           </div>
 
           {/* State Switcher for UI Verification */}

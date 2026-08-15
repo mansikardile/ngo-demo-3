@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Calendar, 
   Users, 
@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, Cell } from 'recharts';
 import { useAdmin } from '../../context/AdminContext';
-import { TIME_SERIES_REGISTRATION_DATA } from '../../data/mockData';
 import { DateFilterRange } from '../../types';
 
 export const DashboardOverview: React.FC = () => {
@@ -53,18 +52,37 @@ export const DashboardOverview: React.FC = () => {
     { label: t('date_custom'), value: 'custom' },
   ];
 
-  // Aggregated KPI numbers
-  const totalEventsCount = 24; // Comprehensive network
-  const totalRegistrations = 4280 + (leads.length - 12);
-  const applicationsStarted = 3120;
-  const applicationsCompleted = 1890;
-  const overallConversion = ((applicationsCompleted / totalRegistrations) * 100).toFixed(1);
+  // Aggregated KPI numbers — computed from live data
+  const totalEventsCount = events.length;
+  const totalRegistrations = events.reduce((sum, e) => sum + (e.metrics?.registered || 0), 0) || leads.length;
+  const applicationsStarted = events.reduce((sum, e) => sum + (e.metrics?.started || 0), 0) || leads.filter(l => l.applicationStatus === 'Started' || l.applicationStatus === 'In Progress' || l.applicationStatus === 'Completed').length;
+  const applicationsCompleted = events.reduce((sum, e) => sum + (e.metrics?.completed || 0), 0) || leads.filter(l => l.applicationStatus === 'Completed').length;
+  const overallConversion = totalRegistrations > 0 ? ((applicationsCompleted / totalRegistrations) * 100).toFixed(1) : '0.0';
 
   // Top events
-  const topEvents = [...events].sort((a, b) => b.metrics.conversionRate - a.metrics.conversionRate).slice(0, 5);
+  const topEvents = [...events].sort((a, b) => (b.metrics?.conversionRate || 0) - (a.metrics?.conversionRate || 0)).slice(0, 5);
 
   // Recent leads (first 6)
   const recentLeads = leads.slice(0, 6);
+
+  // Chart data — computed from real leads grouped by registration date
+  const chartData = useMemo(() => {
+    const dateMap: Record<string, { registrations: number; completed: number }> = {};
+    leads.forEach(l => {
+      const date = l.registrationDate || 'Unknown';
+      if (!dateMap[date]) dateMap[date] = { registrations: 0, completed: 0 };
+      dateMap[date].registrations += 1;
+      if (l.applicationStatus === 'Completed') dateMap[date].completed += 1;
+    });
+    return Object.entries(dateMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-14)
+      .map(([date, counts]) => ({
+        date: new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+        registrations: counts.registrations,
+        completed: counts.completed
+      }));
+  }, [leads]);
 
   const maskPhone = (phone: string) => {
     if (!maskPII) return phone;
@@ -352,7 +370,7 @@ export const DashboardOverview: React.FC = () => {
             {/* Chart Area */}
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={TIME_SERIES_REGISTRATION_DATA} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorDaily" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#E11D48" stopOpacity={0.3} />

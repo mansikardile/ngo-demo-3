@@ -6,11 +6,7 @@ import {
   ApplicationFormData, 
   OfflineSyncItem 
 } from '../types';
-import { 
-  MOCK_EVENTS, 
-  MOCK_STUDENTS, 
-  INITIAL_APPLICATION_DRAFT 
-} from '../data/mockData';
+import { INITIAL_APPLICATION_DRAFT } from '../data/mockData';
 import { translations } from '../i18n/translations';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
@@ -40,6 +36,7 @@ interface AppContextType {
   currentView: ViewType;
   navigateTo: (view: ViewType, trackingIdOrEventId?: string) => void;
   
+  eventsList: EventInfo[];
   currentEvent: EventInfo | null;
   setCurrentEvent: (event: EventInfo | null) => void;
   selectEventById: (id: string) => void;
@@ -65,9 +62,8 @@ interface AppContextType {
   isEventModalOpen: boolean;
   setIsEventModalOpen: (open: boolean) => void;
   
-  // Lookup helper for status and links
-  findStudentByTrackingOrPhone: (query: string) => StudentRegistrationData | undefined;
-  registerNewStudent: (data: Omit<StudentRegistrationData, 'trackingId' | 'registeredAt' | 'status' | 'personalizedLink'>) => StudentRegistrationData;
+  findStudentByTrackingOrPhone: (query: string) => Promise<StudentRegistrationData | undefined>;
+  registerNewStudent: (data: Omit<StudentRegistrationData, 'trackingId' | 'registeredAt' | 'status' | 'personalizedLink'>) => Promise<StudentRegistrationData>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -76,11 +72,31 @@ const LOCAL_STORAGE_KEY_STUDENTS = 'katalyst_students_v1';
 const LOCAL_STORAGE_KEY_APP_DRAFT = 'katalyst_app_draft_v1';
 const LOCAL_STORAGE_KEY_SYNC_QUEUE = 'katalyst_offline_sync_v1';
 
+const mapDbEventToEventInfo = (e: any): EventInfo => ({
+  id: e.event_code || e.id,
+  code: e.event_code,
+  title: e.title,
+  collegeName: e.college_name,
+  city: e.location?.split(',')[1]?.trim() || 'Pune',
+  state: 'Maharashtra',
+  date: e.event_date ? new Date(e.event_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Upcoming',
+  time: '10:00 AM – 02:00 PM IST',
+  venue: e.location || 'College Campus',
+  coordinatorName: 'Katalyst Outreach Lead',
+  coordinatorPhone: '+91 98000 00000',
+  coordinatorEmail: 'outreach@katalystindia.org',
+  status: e.status === 'Archived' ? 'inactive' : 'active',
+  description: e.description || 'Katalyst STEM Fellowship and scholarship outreach initiative empowering female engineering students.',
+  eligibleBranches: ['Computer Science', 'Information Technology', 'AI & Data Science', 'Electronics', 'Mechanical', 'All STEM Branches'],
+  bannerSubtitle: 'Official College Outreach & On-Spot Registration'
+});
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('en');
   const [currentView, setCurrentView] = useState<ViewType>('event-landing');
-  const [currentEvent, setCurrentEvent] = useState<EventInfo | null>(MOCK_EVENTS[0]);
-  const [activeStudent, setActiveStudent] = useState<StudentRegistrationData | null>(MOCK_STUDENTS[0]);
+  const [eventsList, setEventsList] = useState<EventInfo[]>([]);
+  const [currentEvent, setCurrentEvent] = useState<EventInfo | null>(null);
+  const [activeStudent, setActiveStudent] = useState<StudentRegistrationData | null>(null);
   const [applicationData, setApplicationData] = useState<ApplicationFormData>(INITIAL_APPLICATION_DRAFT);
   
   const [isBrowserOnline, setIsBrowserOnline] = useState<boolean>(navigator.onLine);
@@ -110,7 +126,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const isOffline = !isBrowserOnline || isSimulatedOffline;
 
-  // Load from local storage and URL query params on mount
+  // Fetch events from Supabase on mount
+  useEffect(() => {
+    const fetchEvents = async () => {
+      if (!isSupabaseConfigured()) return;
+
+      try {
+        const { data: dbEvents, error } = await supabase
+          .from('events')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && dbEvents && dbEvents.length > 0) {
+          const mapped = dbEvents.map(mapDbEventToEventInfo);
+          setEventsList(mapped);
+
+          // Check URL query parameters (e.g. ?event=EVT-COEP-2026)
+          const urlParams = new URLSearchParams(window.location.search);
+          const eventParam = urlParams.get('event') || urlParams.get('eventCode');
+
+          if (eventParam) {
+            const matched = mapped.find(e => 
+              e.code.toLowerCase() === eventParam.toLowerCase() || 
+              e.id.toLowerCase() === eventParam.toLowerCase()
+            );
+            if (matched) {
+              setCurrentEvent(matched);
+              setCurrentView('event-landing');
+            } else {
+              setCurrentEvent(null);
+              setCurrentView('event-error');
+            }
+          } else {
+            setCurrentEvent(mapped[0]);
+          }
+        }
+      } catch (err) {
+        console.warn('Student portal events fetch error:', err);
+      }
+    };
+
+    fetchEvents();
+  }, []);
+
+  // Load from local storage draft
   useEffect(() => {
     try {
       const storedDraft = localStorage.getItem(LOCAL_STORAGE_KEY_APP_DRAFT);
@@ -122,21 +181,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setPendingSyncItems(JSON.parse(storedQueue));
       }
 
-      // Check URL search params (e.g. ?event=EVT-COEP-2026 or ?track=KAT-COEP-88219)
+      // Check URL query params for tracking
       const urlParams = new URLSearchParams(window.location.search);
-      const eventParam = urlParams.get('event') || urlParams.get('eventCode');
       const trackParam = urlParams.get('track') || urlParams.get('apply');
 
-      if (eventParam) {
-        selectEventById(eventParam);
-      } else if (trackParam) {
-        const student = findStudentByTrackingOrPhone(trackParam);
-        if (student) {
-          setActiveStudent(student);
-          setCurrentView('apply');
-        } else {
-          setCurrentView('status');
-        }
+      if (trackParam) {
+        findStudentByTrackingOrPhone(trackParam).then(student => {
+          if (student) {
+            setActiveStudent(student);
+            setCurrentView('apply');
+          } else {
+            setCurrentView('status');
+          }
+        });
       }
     } catch (e) {
       console.warn('Storage or URL param read failed', e);
@@ -178,7 +235,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Progress Saved', 'Your application draft is safely stored on this device.', 'success');
   };
 
-  const submitApplication = () => {
+  const submitApplication = async () => {
     const now = new Date();
     const formattedDate = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
     
@@ -194,6 +251,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         status: 'APPLICATION_SUBMITTED'
       } : null);
+    }
+
+    // Persist to Supabase applications table
+    if (isSupabaseConfigured() && !isOffline && activeStudent) {
+      try {
+        // Find lead id
+        const { data: leadData } = await supabase
+          .from('leads')
+          .select('id, event_id')
+          .eq('tracking_token', activeStudent.trackingId)
+          .single();
+
+        if (leadData) {
+          await supabase.from('applications').upsert({
+            lead_id: leadData.id,
+            tracking_token: activeStudent.trackingId,
+            event_id: leadData.event_id,
+            step_completed: 6,
+            stem_interest: applicationData.careerGoal || 'Engineering & STEM',
+            gpa_score: parseFloat(applicationData.currentSemesterCgpa) || 8.5,
+            family_income_bracket: applicationData.annualFamilyIncome || '< ₹2,00,000 / annum',
+            essay_response: applicationData.whyKatalyst || '',
+            status: 'Under Review',
+            submitted_at: new Date().toISOString()
+          }, { onConflict: 'lead_id' });
+
+          // Update lead status to Completed
+          await supabase
+            .from('leads')
+            .update({ status: 'Completed', updated_at: new Date().toISOString() })
+            .eq('id', leadData.id);
+        }
+      } catch (err) {
+        console.warn('Supabase application submission error:', err);
+      }
     }
 
     if (isOffline) {
@@ -231,7 +323,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     
-    // Simulate syncing
     showToast('Syncing in Progress', `Transmitting ${pendingSyncItems.length} record(s) to Katalyst servers...`, 'info');
     setTimeout(() => {
       setPendingSyncItems([]);
@@ -256,7 +347,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const selectEventById = (id: string) => {
-    const found = MOCK_EVENTS.find(e => e.id.toLowerCase() === id.toLowerCase() || e.code.toLowerCase() === id.toLowerCase());
+    const found = eventsList.find(e => e.id.toLowerCase() === id.toLowerCase() || e.code.toLowerCase() === id.toLowerCase());
     if (found) {
       setCurrentEvent(found);
       if (found.status === 'active') {
@@ -265,36 +356,84 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentView('event-error');
       }
     } else {
-      // Invalid event code
-      setCurrentEvent(null);
-      setCurrentView('event-error');
+      // Query Supabase directly in case it was created recently
+      if (isSupabaseConfigured()) {
+        supabase.from('events').select('*').ilike('event_code', id).single().then(({ data }) => {
+          if (data) {
+            const mapped = mapDbEventToEventInfo(data);
+            setCurrentEvent(mapped);
+            setCurrentView('event-landing');
+          } else {
+            setCurrentEvent(null);
+            setCurrentView('event-error');
+          }
+        });
+      } else {
+        setCurrentEvent(null);
+        setCurrentView('event-error');
+      }
     }
   };
 
-  const findStudentByTrackingOrPhone = (query: string): StudentRegistrationData | undefined => {
+  const findStudentByTrackingOrPhone = async (query: string): Promise<StudentRegistrationData | undefined> => {
     const clean = query.trim().toLowerCase();
     if (!clean) return undefined;
     
-    // Check in-memory mock students + custom registered ones in localStorage
-    let allStudents = [...MOCK_STUDENTS];
+    // Check Supabase first
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('leads')
+          .select('*')
+          .or(`tracking_token.ilike.%${clean}%,phone.ilike.%${clean}%,email.ilike.%${clean}%`)
+          .limit(1)
+          .single();
+
+        if (!error && data) {
+          const student: StudentRegistrationData = {
+            trackingId: data.tracking_token,
+            eventId: data.event_id || '',
+            eventCode: data.event_code,
+            eventName: data.event_code,
+            fullName: data.full_name,
+            email: data.email,
+            phone: data.phone,
+            college: data.college_name,
+            yearOfStudy: data.academic_year,
+            fieldOfStudy: data.field_of_study,
+            gender: 'Female',
+            consentDataProcessing: data.consent_given,
+            consentFutureComms: true,
+            registeredAt: new Date(data.created_at).toLocaleString(),
+            status: data.status === 'Completed' ? 'APPLICATION_SUBMITTED' : data.status === 'Started' ? 'APPLICATION_STARTED' : 'REGISTERED',
+            personalizedLink: `/apply/${data.tracking_token}`
+          };
+          return student;
+        }
+      } catch (err) {
+        console.warn('Supabase lead query error:', err);
+      }
+    }
+
+    // Fallback to local storage
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY_STUDENTS);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        allStudents = [...parsed, ...allStudents];
+        const parsed: StudentRegistrationData[] = JSON.parse(saved);
+        return parsed.find(s => 
+          s.trackingId.toLowerCase() === clean ||
+          s.phone.replace(/\D/g, '').endsWith(clean.replace(/\D/g, '')) ||
+          s.email.toLowerCase() === clean
+        );
       }
     } catch (e) {
       console.warn(e);
     }
 
-    return allStudents.find(s => 
-      s.trackingId.toLowerCase() === clean ||
-      s.phone.replace(/\D/g, '').endsWith(clean.replace(/\D/g, '')) ||
-      s.email.toLowerCase() === clean
-    );
+    return undefined;
   };
 
-  const registerNewStudent = (data: Omit<StudentRegistrationData, 'trackingId' | 'registeredAt' | 'status' | 'personalizedLink'>): StudentRegistrationData => {
+  const registerNewStudent = async (data: Omit<StudentRegistrationData, 'trackingId' | 'registeredAt' | 'status' | 'personalizedLink'>): Promise<StudentRegistrationData> => {
     const randomNum = Math.floor(100000 + Math.random() * 900000);
     const trackingId = `STU-2026-${randomNum}`;
     const now = new Date();
@@ -308,10 +447,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       personalizedLink: `/apply/${trackingId}`
     };
 
-    // Save student
     setActiveStudent(newStudent);
 
-    // Initialize application data with student info
     setApplicationData(prev => ({
       ...prev,
       fullName: newStudent.fullName,
@@ -333,21 +470,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (isSupabaseConfigured() && !isOffline) {
-      supabase.from('leads').insert({
-        event_code: data.eventCode || currentEvent?.code || 'EVT-COEP-2026',
-        full_name: newStudent.fullName,
-        email: newStudent.email,
-        phone: newStudent.phone,
-        college_name: newStudent.college,
-        academic_year: newStudent.yearOfStudy,
-        field_of_study: newStudent.fieldOfStudy,
-        tracking_token: trackingId,
-        status: 'Registered',
-        consent_given: newStudent.consentDataProcessing || false,
-        signature_data_url: newStudent.signatureDataUrl || null
-      }).then(({ error }) => {
-        if (error) console.warn('Supabase lead insert error:', error);
-      });
+      try {
+        // Query event ID
+        let eventId: string | null = null;
+        const { data: eventDb } = await supabase
+          .from('events')
+          .select('id')
+          .eq('event_code', data.eventCode || currentEvent?.code || 'EVT-COEP-2026')
+          .single();
+
+        if (eventDb) {
+          eventId = eventDb.id;
+        }
+
+        await supabase.from('leads').insert({
+          event_id: eventId,
+          event_code: data.eventCode || currentEvent?.code || 'EVT-COEP-2026',
+          full_name: newStudent.fullName,
+          email: newStudent.email,
+          phone: newStudent.phone,
+          college_name: newStudent.college,
+          academic_year: newStudent.yearOfStudy,
+          field_of_study: newStudent.fieldOfStudy,
+          tracking_token: trackingId,
+          status: 'Registered',
+          consent_given: newStudent.consentDataProcessing || false,
+          signature_data_url: newStudent.signatureDataUrl || null
+        });
+      } catch (err) {
+        console.warn('Supabase lead insert error:', err);
+      }
     }
 
     if (isOffline) {
@@ -369,13 +521,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const navigateTo = (view: ViewType, trackingIdOrEventId?: string) => {
+  const navigateTo = async (view: ViewType, trackingIdOrEventId?: string) => {
     if (view === 'event-landing' && trackingIdOrEventId) {
       selectEventById(trackingIdOrEventId);
       return;
     }
     if (view === 'apply' && trackingIdOrEventId) {
-      const student = findStudentByTrackingOrPhone(trackingIdOrEventId);
+      const student = await findStudentByTrackingOrPhone(trackingIdOrEventId);
       if (student) {
         setActiveStudent(student);
       }
@@ -393,6 +545,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       t,
       currentView,
       navigateTo,
+      eventsList,
       currentEvent,
       setCurrentEvent,
       selectEventById,
