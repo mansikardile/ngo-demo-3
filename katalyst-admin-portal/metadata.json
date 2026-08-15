@@ -1,0 +1,6 @@
+{
+  "name": "Katalyst Admin Portal",
+  "description": "Comprehensive Student Outreach and Application Tracking System Admin Portal for Katalyst NGO",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
