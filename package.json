@@ -1,0 +1,13 @@
+{
+  "name": "ngo-demo-3",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Katalyst NGO Student Outreach & Application Tracking System Monorepo Root",
+  "scripts": {
+    "dev:admin": "npm --prefix katalyst-admin-portal run dev",
+    "dev:student": "npm --prefix katalyst-student-portal run dev",
+    "install:all": "npm --prefix katalyst-admin-portal install && npm --prefix katalyst-student-portal install",
+    "build:admin": "npm --prefix katalyst-admin-portal run build",
+    "build:student": "npm --prefix katalyst-student-portal run build"
+  }
+}

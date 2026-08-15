@@ -110,7 +110,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const isOffline = !isBrowserOnline || isSimulatedOffline;
 
-  // Load from local storage on mount
+  // Load from local storage and URL query params on mount
   useEffect(() => {
     try {
       const storedDraft = localStorage.getItem(LOCAL_STORAGE_KEY_APP_DRAFT);
@@ -121,8 +121,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (storedQueue) {
         setPendingSyncItems(JSON.parse(storedQueue));
       }
+
+      // Check URL search params (e.g. ?event=EVT-COEP-2026 or ?track=KAT-COEP-88219)
+      const urlParams = new URLSearchParams(window.location.search);
+      const eventParam = urlParams.get('event') || urlParams.get('eventCode');
+      const trackParam = urlParams.get('track') || urlParams.get('apply');
+
+      if (eventParam) {
+        selectEventById(eventParam);
+      } else if (trackParam) {
+        const student = findStudentByTrackingOrPhone(trackParam);
+        if (student) {
+          setActiveStudent(student);
+          setCurrentView('apply');
+        } else {
+          setCurrentView('status');
+        }
+      }
     } catch (e) {
-      console.warn('Storage read failed', e);
+      console.warn('Storage or URL param read failed', e);
     }
   }, []);
 

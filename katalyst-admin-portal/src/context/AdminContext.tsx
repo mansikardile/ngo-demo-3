@@ -387,7 +387,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       .toUpperCase();
     const eventCount = events.length + 1;
     const eventCode = `EVT-${collegeAcronym}-2026-${String(eventCount).padStart(3, '0')}`;
-    const registrationUrl = `https://katalyst.org/register/${eventCode}`;
+    const registrationUrl = `http://localhost:3001/?event=${eventCode}`;
 
     const newEvent: OutreachEvent = {
       id: `evt-${Date.now()}`,
