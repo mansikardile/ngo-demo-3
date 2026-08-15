@@ -272,20 +272,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } : null);
     }
 
-    // Persist to Supabase applications table
-    if (isSupabaseConfigured() && !isOffline && activeStudent) {
+    // Persist to Supabase applications and leads table
+    if (isSupabaseConfigured() && !isOffline) {
       try {
-        // Find lead id
-        const { data: leadData } = await supabase
+        const trackingToken = applicationData.trackingId || activeStudent?.trackingId || `STU-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+        
+        // Check if lead exists in Supabase
+        let { data: leadData } = await supabase
           .from('leads')
           .select('id, event_id')
-          .eq('tracking_token', activeStudent.trackingId)
-          .single();
+          .eq('tracking_token', trackingToken)
+          .maybeSingle();
+
+        // If lead doesn't exist yet, insert it into Supabase leads table
+        if (!leadData) {
+          const { data: eventDb } = await supabase
+            .from('events')
+            .select('id')
+            .eq('event_code', activeStudent?.eventCode || currentEvent?.code || 'EVT-COEP-2026')
+            .maybeSingle();
+
+          const { data: newLead, error: leadErr } = await supabase
+            .from('leads')
+            .insert({
+              event_id: eventDb?.id || null,
+              event_code: activeStudent?.eventCode || currentEvent?.code || 'EVT-COEP-2026',
+              full_name: applicationData.fullName || activeStudent?.fullName || 'Katalyst Applicant',
+              email: applicationData.email || activeStudent?.email || '',
+              phone: applicationData.phone || activeStudent?.phone || '',
+              college_name: applicationData.collegeName || activeStudent?.college || 'College of Engineering Pune (COEP)',
+              academic_year: applicationData.yearOfStudy || activeStudent?.yearOfStudy || '2nd Year B.Tech',
+              field_of_study: applicationData.branch || activeStudent?.fieldOfStudy || 'Computer Engineering',
+              tracking_token: trackingToken,
+              status: 'Completed',
+              consent_given: true
+            })
+            .select('id, event_id')
+            .single();
+
+          if (!leadErr && newLead) {
+            leadData = newLead;
+          }
+        }
 
         if (leadData) {
+          // Upsert application row in Supabase
           await supabase.from('applications').upsert({
             lead_id: leadData.id,
-            tracking_token: activeStudent.trackingId,
+            tracking_token: trackingToken,
             event_id: leadData.event_id,
             step_completed: 6,
             stem_interest: applicationData.careerGoal || 'Engineering & STEM',
@@ -293,6 +327,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             family_income_bracket: applicationData.annualFamilyIncome || '< ₹2,00,000 / annum',
             essay_response: applicationData.whyKatalyst || '',
             status: 'Under Review',
+            documents_status: 'Verified',
             submitted_at: new Date().toISOString()
           }, { onConflict: 'lead_id' });
 
