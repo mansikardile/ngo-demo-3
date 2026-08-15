@@ -21,12 +21,16 @@ import { QRCodeModal } from './components/events/QRCodeModal';
 import { LeadDetailDrawer } from './components/leads/LeadDetailDrawer';
 
 const AdminPortalApp: React.FC = () => {
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [isMobileOpen, setIsMobileOpen] = React.useState(false);
+
   const { 
     isAuthenticated, 
     activePage, 
+    setActivePage,
     isCreateEventModalOpen, 
     setIsCreateEventModalOpen,
-    isQrModalOpen,
+    isQrModalOpen, 
     setIsQrModalOpen,
     activeQrEvent,
     selectedLeadId,
@@ -65,12 +69,20 @@ const AdminPortalApp: React.FC = () => {
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 antialiased overflow-hidden font-sans">
       {/* Persistent Sidebar */}
-      <Sidebar />
+      <Sidebar 
+        isCollapsed={isCollapsed}
+        setIsCollapsed={setIsCollapsed}
+        isMobileOpen={isMobileOpen}
+        setIsMobileOpen={setIsMobileOpen}
+      />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      {/* Main Content Area with dynamic padding for sidebar */}
+      <div className={`flex-1 flex flex-col min-w-0 h-full overflow-hidden transition-all duration-300 ${isCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         {/* Top Navbar */}
-        <TopNavbar />
+        <TopNavbar 
+          onOpenMobileMenu={() => setIsMobileOpen(true)}
+          onOpenNotifications={() => setActivePage('notifications')}
+        />
 
         {/* Dynamic Page Container */}
         <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 custom-scrollbar">

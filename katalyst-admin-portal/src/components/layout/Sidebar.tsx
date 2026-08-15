@@ -19,18 +19,25 @@ import {
 import { useAdmin, NavigationPage } from '../../context/AdminContext';
 
 interface SidebarProps {
-  isCollapsed: boolean;
-  setIsCollapsed: (collapsed: boolean) => void;
-  isMobileOpen: boolean;
-  setIsMobileOpen: (open: boolean) => void;
+  isCollapsed?: boolean;
+  setIsCollapsed?: (collapsed: boolean) => void;
+  isMobileOpen?: boolean;
+  setIsMobileOpen?: (open: boolean) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  isCollapsed,
-  setIsCollapsed,
-  isMobileOpen,
-  setIsMobileOpen
+  isCollapsed: controlledCollapsed,
+  setIsCollapsed: controlledSetCollapsed,
+  isMobileOpen: controlledMobileOpen,
+  setIsMobileOpen: controlledSetMobileOpen
 }) => {
+  const [internalCollapsed, setInternalCollapsed] = React.useState(false);
+  const [internalMobileOpen, setInternalMobileOpen] = React.useState(false);
+
+  const isCollapsed = controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
+  const setIsCollapsed = controlledSetCollapsed || setInternalCollapsed;
+  const isMobileOpen = controlledMobileOpen !== undefined ? controlledMobileOpen : internalMobileOpen;
+  const setIsMobileOpen = controlledSetMobileOpen || setInternalMobileOpen;
   const { 
     activePage, 
     setActivePage, 
