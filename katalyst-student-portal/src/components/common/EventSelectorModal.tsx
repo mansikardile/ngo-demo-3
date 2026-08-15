@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { X, QrCode, Building, Calendar, MapPin, Check, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { MOCK_EVENTS } from '../../data/mockData';
 
 export const EventSelectorModal: React.FC = () => {
   const { 
     isEventModalOpen, 
     setIsEventModalOpen, 
     currentEvent, 
+    eventsList,
     selectEventById,
     navigateTo 
   } = useApp();
@@ -85,7 +85,7 @@ export const EventSelectorModal: React.FC = () => {
 
           {/* Event Cards List */}
           <div className="grid gap-3">
-            {MOCK_EVENTS.map(event => {
+            {eventsList.map(event => {
               const isSelected = currentEvent?.id === event.id;
               const isActive = event.status === 'active';
 

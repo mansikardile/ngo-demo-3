@@ -72,12 +72,31 @@ const LOCAL_STORAGE_KEY_STUDENTS = 'katalyst_students_v1';
 const LOCAL_STORAGE_KEY_APP_DRAFT = 'katalyst_app_draft_v1';
 const LOCAL_STORAGE_KEY_SYNC_QUEUE = 'katalyst_offline_sync_v1';
 
+const DEFAULT_EVENT: EventInfo = {
+  id: 'EVT-COEP-2026',
+  code: 'EVT-COEP-2026',
+  title: 'COEP Engineering Outreach & Women in Tech Summit',
+  collegeName: 'College of Engineering Pune (COEP)',
+  city: 'Pune',
+  state: 'Maharashtra',
+  date: '20 August 2026',
+  time: '10:00 AM – 02:00 PM IST',
+  venue: 'Auditorium B, COEP Campus, Pune',
+  coordinatorName: 'Katalyst Outreach Lead',
+  coordinatorPhone: '+91 98000 00000',
+  coordinatorEmail: 'outreach@katalystindia.org',
+  status: 'active',
+  description: 'Interactive session introducing high-potential female engineering students to Katalyst corporate mentorship and scholarship.',
+  eligibleBranches: ['Computer Science', 'Information Technology', 'AI & Data Science', 'Electronics', 'Mechanical', 'All STEM Branches'],
+  bannerSubtitle: 'Official College Outreach & On-Spot Registration'
+};
+
 const mapDbEventToEventInfo = (e: any): EventInfo => ({
   id: e.event_code || e.id,
   code: e.event_code,
   title: e.title,
   collegeName: e.college_name,
-  city: e.location?.split(',')[1]?.trim() || 'Pune',
+  city: e.location?.split(',')[1]?.trim() || e.location?.split(',')[0]?.trim() || 'Pune',
   state: 'Maharashtra',
   date: e.event_date ? new Date(e.event_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Upcoming',
   time: '10:00 AM – 02:00 PM IST',
@@ -94,8 +113,8 @@ const mapDbEventToEventInfo = (e: any): EventInfo => ({
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('en');
   const [currentView, setCurrentView] = useState<ViewType>('event-landing');
-  const [eventsList, setEventsList] = useState<EventInfo[]>([]);
-  const [currentEvent, setCurrentEvent] = useState<EventInfo | null>(null);
+  const [eventsList, setEventsList] = useState<EventInfo[]>([DEFAULT_EVENT]);
+  const [currentEvent, setCurrentEvent] = useState<EventInfo | null>(DEFAULT_EVENT);
   const [activeStudent, setActiveStudent] = useState<StudentRegistrationData | null>(null);
   const [applicationData, setApplicationData] = useState<ApplicationFormData>(INITIAL_APPLICATION_DRAFT);
   

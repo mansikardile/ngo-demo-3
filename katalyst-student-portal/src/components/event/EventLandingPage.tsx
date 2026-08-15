@@ -27,9 +27,24 @@ export const EventLandingPage: React.FC = () => {
     activeStudent 
   } = useApp();
 
-  if (!currentEvent || currentEvent.status !== 'active') {
-    return null;
-  }
+  const event = currentEvent || {
+    id: 'EVT-COEP-2026',
+    code: 'EVT-COEP-2026',
+    title: 'COEP Engineering Outreach & Women in Tech Summit',
+    collegeName: 'College of Engineering Pune (COEP)',
+    city: 'Pune',
+    state: 'Maharashtra',
+    date: '20 August 2026',
+    time: '10:00 AM – 02:00 PM IST',
+    venue: 'Auditorium B, COEP Campus, Pune',
+    coordinatorName: 'Katalyst Outreach Lead',
+    coordinatorPhone: '+91 98000 00000',
+    coordinatorEmail: 'outreach@katalystindia.org',
+    status: 'active' as const,
+    description: 'Interactive session introducing high-potential female engineering students to Katalyst corporate mentorship and scholarship.',
+    eligibleBranches: ['Computer Science', 'Information Technology', 'AI & Data Science', 'Electronics', 'Mechanical', 'All STEM Branches'],
+    bannerSubtitle: 'Official College Outreach & On-Spot Registration'
+  };
 
   return (
     <div className="w-full bg-slate-50/50 pb-16">
@@ -39,10 +54,10 @@ export const EventLandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="bg-rose-700/80 border border-rose-500/50 text-rose-100 px-2 py-0.5 rounded text-[11px] font-mono font-bold tracking-wide">
-              {currentEvent.code}
+              {event.code}
             </span>
             <span className="font-medium text-rose-100">
-              Campus Outreach Drive is live at <strong className="text-white">{currentEvent.collegeName}</strong>
+              Campus Outreach Drive is live at <strong className="text-white">{event.collegeName}</strong>
             </span>
           </div>
           <button
