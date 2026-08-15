@@ -1,9 +1,11 @@
 import React, { createContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { 
   AdminUser, 
-  AdminRole,
+  AdminRole, 
   OutreachEvent, 
   StudentLead, 
+  StudentApplication,
+  ApplicationStage,
   ApplicationRecord, 
   NotificationItem, 
   ExportJob, 
@@ -59,7 +61,7 @@ interface AdminContextType {
   // Data
   events: OutreachEvent[];
   leads: StudentLead[];
-  applications: ApplicationRecord[];
+  applications: StudentApplication[];
   notifications: NotificationItem[];
   exports: ExportJob[];
   exportJobs: any[];
@@ -187,40 +189,47 @@ const mapDbLead = (l: any): StudentLead => ({
   notes: Array.isArray(l.notes) ? l.notes : []
 });
 
-// ─── Helper: Map Supabase DB row → ApplicationRecord ───
-const mapDbApplication = (a: any, leadMap: Map<string, any>): ApplicationRecord => {
-  const lead = leadMap.get(a.lead_id);
+// ─── Helper: Map Supabase DB row → StudentApplication ───
+const mapDbApplication = (a: any, leadMap: Map<string, any>): StudentApplication => {
+  const lead = leadMap.get(a.lead_id) || Array.from(leadMap.values()).find((l: any) => l.tracking_token === a.tracking_token);
+  
+  let stage: ApplicationStage = 'Under Review';
+  if (a.status === 'Accepted' || a.status === 'Shortlisted') {
+    stage = 'Shortlisted';
+  } else if (a.status === 'Under Review') {
+    stage = 'Under Review';
+  } else if (a.status === 'Submitted') {
+    stage = 'Submitted';
+  } else if (a.step_completed >= 5) {
+    stage = 'Document Verification';
+  } else if (a.step_completed >= 3) {
+    stage = 'Academic Details';
+  } else if (a.step_completed >= 1) {
+    stage = 'Personal Info';
+  } else {
+    stage = 'Draft';
+  }
+
+  const verificationStatus: 'Verified' | 'Pending' | 'Rejected' = 
+    a.documents_status === 'Verified' ? 'Verified' : 
+    a.documents_status === 'Rejected' ? 'Rejected' : 'Pending';
+
   return {
     id: a.id,
-    leadId: a.lead_id,
-    trackingId: a.tracking_token,
-    studentName: lead?.full_name || '',
-    studentEmail: lead?.email || '',
-    studentPhone: lead?.phone || '',
-    college: lead?.college_name || '',
-    fieldOfStudy: lead?.field_of_study || '',
-    yearOfStudy: lead?.academic_year || '',
-    eventId: a.event_id || '',
-    eventName: lead?.event_code || '',
-    eventCode: lead?.event_code || '',
-    startedAt: a.created_at ? new Date(a.created_at).toISOString().split('T')[0] : '',
-    lastActivityAt: a.updated_at ? new Date(a.updated_at).toLocaleString() : '',
-    status: a.status === 'Under Review' ? 'Completed' : a.status === 'Draft' ? 'Started' : 'Registered',
-    progress: a.step_completed ? Math.min(a.step_completed * 20, 100) : 0,
-    completedSections: {
-      personalDetails: (a.step_completed || 0) >= 1,
-      academicHistory: (a.step_completed || 0) >= 2,
-      financialEligibility: (a.step_completed || 0) >= 3,
-      familyBackground: (a.step_completed || 0) >= 4,
-      statementOfPurpose: (a.step_completed || 0) >= 5,
-      documentUploads: (a.step_completed || 0) >= 6,
-    },
-    documentsStatus: {
-      incomeCertificate: a.documents_status === 'Verified' ? 'Verified' : 'Pending Review',
-      marksheet12th: a.documents_status === 'Verified' ? 'Verified' : 'Pending Review',
-      collegeIdProof: a.documents_status === 'Verified' ? 'Verified' : 'Not Uploaded',
-      aadhaarCard: 'Not Uploaded',
-    }
+    leadId: a.lead_id || lead?.id || a.id,
+    applicationId: `APP-${a.tracking_token || a.id.slice(0, 8).toUpperCase()}`,
+    trackingId: a.tracking_token || lead?.tracking_token || '',
+    studentName: lead?.full_name || 'Katalyst Applicant',
+    email: lead?.email || '',
+    phone: lead?.phone || '',
+    college: lead?.college_name || 'Engineering College',
+    fieldOfStudy: a.stem_interest || lead?.field_of_study || 'Engineering & STEM',
+    yearOfStudy: lead?.academic_year || '2nd Year',
+    stage,
+    academicScore: a.gpa_score ? `${a.gpa_score} CGPA` : '8.5 CGPA',
+    incomeVerificationStatus: verificationStatus,
+    documentsUploaded: a.step_completed ? Math.min(a.step_completed, 4) : 2,
+    submissionDate: a.submitted_at ? new Date(a.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : (a.created_at ? new Date(a.created_at).toLocaleDateString('en-GB') : 'Recently')
   };
 };
 
@@ -241,7 +250,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // ─── Data State (all empty, populated from Supabase) ───
   const [events, setEvents] = useState<OutreachEvent[]>([]);
   const [leads, setLeads] = useState<StudentLead[]>([]);
-  const [applications, setApplications] = useState<ApplicationRecord[]>([]);
+  const [applications, setApplications] = useState<StudentApplication[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [exportsList, setExportsList] = useState<ExportJob[]>([]);
   const [googleSheetsConfig, setGoogleSheetsConfig] = useState<GoogleSheetsSyncConfig>({
@@ -334,7 +343,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           setEvents(dbEvents.map(mapDbEvent));
         }
 
-        // ── Fetch leads ──
+        // ── Fetch leads & applications ──
         const { data: dbLeads } = await supabase
           .from('leads')
           .select('*')
@@ -343,16 +352,38 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (dbLeads && dbLeads.length > 0) {
           setLeads(dbLeads.map(mapDbLead));
 
-          // ── Fetch applications (needs lead map for enrichment) ──
           const leadMap = new Map(dbLeads.map(l => [l.id, l]));
           const { data: dbApps } = await supabase
             .from('applications')
             .select('*')
             .order('created_at', { ascending: false });
 
-          if (dbApps && dbApps.length > 0) {
-            setApplications(dbApps.map(a => mapDbApplication(a, leadMap)));
-          }
+          const mappedApps: StudentApplication[] = (dbApps || []).map(a => mapDbApplication(a, leadMap));
+          
+          const existingLeadIds = new Set((dbApps || []).map(a => a.lead_id));
+          dbLeads.forEach(lead => {
+            if (!existingLeadIds.has(lead.id)) {
+              mappedApps.push({
+                id: `app-lead-${lead.id}`,
+                leadId: lead.id,
+                applicationId: `APP-${lead.tracking_token}`,
+                trackingId: lead.tracking_token,
+                studentName: lead.full_name,
+                email: lead.email,
+                phone: lead.phone,
+                college: lead.college_name,
+                fieldOfStudy: lead.field_of_study,
+                yearOfStudy: lead.academic_year || '2nd Year',
+                stage: lead.status === 'Completed' ? 'Submitted' : lead.status === 'Started' ? 'Personal Info' : 'Draft',
+                academicScore: '8.5 CGPA',
+                incomeVerificationStatus: lead.status === 'Completed' ? 'Verified' : 'Pending',
+                documentsUploaded: lead.status === 'Completed' ? 4 : 1,
+                submissionDate: lead.created_at ? new Date(lead.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recently'
+              });
+            }
+          });
+
+          setApplications(mappedApps);
         }
 
         // ── Fetch admin profiles ──
@@ -913,11 +944,19 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const updateApplicationStage = (appId: string, stage: string) => {
     setApplications(prev => prev.map(app => {
-      if (app.id === appId || app.leadId === appId) {
-        return { ...app, status: stage === 'Completed' ? 'Completed' : stage === 'Under Review' || stage === 'Shortlisted' ? 'Completed' : 'In Progress' };
+      if (app.id === appId || app.leadId === appId || app.applicationId === appId) {
+        return { ...app, stage: stage as ApplicationStage };
       }
       return app;
     }));
+
+    if (isSupabaseConfigured()) {
+      const dbStatus = (stage === 'Shortlisted' || stage === 'Accepted') ? 'Accepted' :
+        stage === 'Under Review' ? 'Under Review' :
+        stage === 'Rejected' ? 'Rejected' : 'Draft';
+
+      supabase.from('applications').update({ status: dbStatus, updated_at: new Date().toISOString() }).or(`id.eq.${appId},lead_id.eq.${appId}`);
+    }
   };
 
   const addTeamMember = (member: { name: string; email: string; role: AdminRole; avatarUrl?: string; city?: string }) => {
