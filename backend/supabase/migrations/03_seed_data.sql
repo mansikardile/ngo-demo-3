@@ -89,7 +89,7 @@ ON CONFLICT (event_code) DO NOTHING;
 INSERT INTO public.leads (id, event_id, event_code, full_name, email, phone, college_name, academic_year, field_of_study, tracking_token, status, consent_given)
 VALUES 
 (
-    'l1111111-1111-1111-1111-111111111111',
+    'c1111111-1111-1111-1111-111111111111',
     'e1111111-1111-1111-1111-111111111111',
     'EVT-COEP-2026',
     'Priya Sharma',
@@ -103,7 +103,7 @@ VALUES
     true
 ),
 (
-    'l2222222-2222-2222-2222-222222222222',
+    'c2222222-2222-2222-2222-222222222222',
     'e1111111-1111-1111-1111-111111111111',
     'EVT-COEP-2026',
     'Ananya Deshmukh',
@@ -117,7 +117,7 @@ VALUES
     true
 ),
 (
-    'l3333333-3333-3333-3333-333333333333',
+    'c3333333-3333-3333-3333-333333333333',
     'e2222222-2222-2222-2222-222222222222',
     'EVT-VJTI-2026',
     'Sneha Kulkarni',
@@ -136,7 +136,7 @@ ON CONFLICT (tracking_token) DO NOTHING;
 INSERT INTO public.applications (lead_id, tracking_token, event_id, step_completed, stem_interest, gpa_score, family_income_bracket, essay_response, status)
 VALUES 
 (
-    'l1111111-1111-1111-1111-111111111111',
+    'c1111111-1111-1111-1111-111111111111',
     'KAT-COEP-88219',
     'e1111111-1111-1111-1111-111111111111',
     4,
