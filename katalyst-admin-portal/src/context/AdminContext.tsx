@@ -867,10 +867,5 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   );
 };
 
-export const useAdmin = () => {
-  const context = useContext(AdminContext);
-  if (!context) {
-    throw new Error('useAdmin must be used within an AdminProvider');
-  }
-  return context;
-};
+export { AdminContext };
+export { useAdmin } from './useAdmin';
