@@ -1,20 +1,30 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Katalyst Student Portal
 
-# Run and deploy your AI Studio app
+Interactive student portal empowering candidates to express interest in Katalyst STEM outreach events, track application status transparently, and complete digital enrollment.
 
-This contains everything you need to run your app locally.
+## Features
+- **Event Interest Registration**: Express interest with auto-filled event tags.
+- **Application Portal**: Personalized application link with unique tracking ID.
+- **Multi-Language Support**: Switch language dynamically for accessibility.
+- **Offline Mode & Sync**: Supports offline registration in remote areas with later sync.
+- **Consent & Signature**: Digital signature capture for consent and notification tracking.
 
-View your app in AI Studio: https://ai.studio/apps/9c8864ac-4056-47ba-b68e-80d2f15180e3
+## Getting Started
 
-## Run Locally
+### Prerequisites
+- Node.js (v18 or higher)
+- npm or bun
 
-**Prerequisites:**  Node.js
-
+### Local Setup
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+3. Open your browser and navigate to `http://localhost:3000`.

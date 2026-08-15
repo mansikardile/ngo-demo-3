@@ -1,6 +1,0 @@
-{
-  "name": "Katalyst Student Portal",
-  "description": "Student outreach, instant event registration, and guided application tracking platform for Katalyst STEM scholarship initiatives.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

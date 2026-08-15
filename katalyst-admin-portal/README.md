@@ -1,20 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Katalyst Admin Portal
 
-# Run and deploy your AI Studio app
+Centralized portal for Katalyst NGO administrators to seamlessly create events with unique identifiers, enable efficient lead tracking, export leads, and track conversion funnels.
 
-This contains everything you need to run your app locally.
+## Features
+- **Event Management**: Create and manage events with unique tracking IDs & QR codes.
+- **Real-Time Leads**: Monitor interested candidates by event in real time.
+- **Conversion Tracking**: View funnel progress from Registered → Started → Completed.
+- **Export & Sync**: Export lead data to CSV and synchronize with Google Sheets.
 
-View your app in AI Studio: https://ai.studio/apps/b952075c-d09e-498c-85c7-6e13b56f2275
+## Getting Started
 
-## Run Locally
+### Prerequisites
+- Node.js (v18 or higher)
+- npm or bun
 
-**Prerequisites:**  Node.js
-
+### Local Setup
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+3. Open your browser and navigate to `http://localhost:3000`.
