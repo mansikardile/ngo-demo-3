@@ -135,7 +135,7 @@ const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(INITIAL_ADMIN_USERS[0]);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(INITIAL_ADMIN_USERS);
 
   const [activePage, setActivePage] = useState<NavigationPage>('dashboard');
@@ -184,31 +184,40 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         // Fetch events
         const { data: dbEvents, error: eventsError } = await supabase.from('events').select('*').order('created_at', { ascending: false });
         if (!eventsError && dbEvents && dbEvents.length > 0) {
-          setEvents(dbEvents.map(e => ({
-            id: e.id,
-            eventCode: e.event_code,
-            name: e.title,
-            collegeName: e.college_name,
-            collegeTier: 'Tier 1',
-            location: e.location,
-            city: e.location.split(',')[1]?.trim() || 'Pune',
-            state: 'Maharashtra',
-            date: new Date(e.event_date).toISOString().split('T')[0],
-            startTime: '10:00 AM',
-            endTime: '04:00 PM',
-            venue: e.location,
-            eventType: 'Engineering Outreach',
-            description: e.description || '',
-            contactPerson: { name: 'Faculty Lead', role: 'Coordinator', email: 'coordinator@college.ac.in', phone: '+91 9800000000' },
-            status: e.status === 'Completed' ? 'completed' : e.status === 'Ongoing' ? 'ongoing' : 'active',
-            funnel: {
-              registered: e.registered_count || 0,
-              started: e.started_count || 0,
-              completed: e.completed_count || 0
-            },
-            qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://katalyst.org/register/${e.event_code}`,
-            registrationUrl: `https://katalyst.org/register/${e.event_code}`
-          })));
+          setEvents(dbEvents.map(e => {
+            const registered = e.registered_count || 0;
+            const started = e.started_count || 0;
+            const completed = e.completed_count || 0;
+            const conversionRate = registered > 0 ? Math.round((completed / registered) * 100) : 0;
+            return {
+              id: e.id,
+              eventCode: e.event_code,
+              name: e.title,
+              collegeName: e.college_name,
+              collegeTier: 'Tier 1',
+              location: e.location,
+              city: e.location?.split(',')[1]?.trim() || 'Pune',
+              state: 'Maharashtra',
+              date: new Date(e.event_date).toISOString().split('T')[0],
+              startTime: '10:00 AM',
+              endTime: '04:00 PM',
+              venue: e.location,
+              eventType: 'Engineering Outreach',
+              description: e.description || '',
+              contactPerson: { name: 'Faculty Lead', role: 'Coordinator', email: 'coordinator@college.ac.in', phone: '+91 9800000000' },
+              status: e.status === 'Completed' ? 'completed' : e.status === 'Ongoing' ? 'ongoing' : 'active',
+              metrics: {
+                registered,
+                started,
+                completed,
+                conversionRate,
+                targetRegistrations: e.max_capacity || 200
+              },
+              qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://katalyst.org/register/${e.event_code}`,
+              registrationUrl: `https://katalyst.org/register/${e.event_code}`,
+              createdAt: e.created_at || new Date().toISOString()
+            };
+          }));
         }
 
         // Fetch leads
