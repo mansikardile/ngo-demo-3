@@ -12,6 +12,7 @@ import {
   INITIAL_APPLICATION_DRAFT 
 } from '../data/mockData';
 import { translations } from '../i18n/translations';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export type ViewType = 
   | 'event-landing'
@@ -312,6 +313,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem(LOCAL_STORAGE_KEY_STUDENTS, JSON.stringify([newStudent, ...parsed]));
     } catch (e) {
       console.warn(e);
+    }
+
+    if (isSupabaseConfigured() && !isOffline) {
+      supabase.from('leads').insert({
+        event_code: data.eventCode || currentEvent?.code || 'EVT-COEP-2026',
+        full_name: newStudent.fullName,
+        email: newStudent.email,
+        phone: newStudent.phone,
+        college_name: newStudent.college,
+        academic_year: newStudent.yearOfStudy,
+        field_of_study: newStudent.fieldOfStudy,
+        tracking_token: trackingId,
+        status: 'Registered',
+        consent_given: newStudent.consentDataProcessing || false,
+        signature_data_url: newStudent.signatureDataUrl || null
+      }).then(({ error }) => {
+        if (error) console.warn('Supabase lead insert error:', error);
+      });
     }
 
     if (isOffline) {

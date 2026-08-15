@@ -20,8 +20,8 @@ import { INITIAL_ADMIN_USERS } from '../../data/mockData';
 export const LoginPage: React.FC = () => {
   const { login } = useAdmin();
   
-  const [email, setEmail] = useState('sunita.rao@katalystindia.org');
-  const [password, setPassword] = useState('••••••••••••');
+  const [email, setEmail] = useState('admin@katalystindia.org');
+  const [password, setPassword] = useState('KatalystAdmin2026!');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loginState, setLoginState] = useState<'default' | 'loading' | 'invalid' | 'locked' | 'network_error' | 'session_expired'>('default');
@@ -82,6 +82,14 @@ export const LoginPage: React.FC = () => {
             <p className="text-xs text-slate-400 mt-0.5">
               Enter your authorized administrative credentials to continue.
             </p>
+            <div className="mt-3 p-2.5 rounded-lg bg-rose-950/40 border border-rose-800/40 text-xs text-slate-300 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-rose-400 block font-mono">DEFAULT ADMIN ACCESS</span>
+                <span className="text-slate-200">Email: <code className="text-rose-300">admin@katalystindia.org</code></span>
+                <span className="mx-2 text-slate-600">|</span>
+                <span className="text-slate-200">Password: <code className="text-rose-300">KatalystAdmin2026!</code></span>
+              </div>
+            </div>
           </div>
 
           {/* Login Error / State Banners */}

@@ -23,6 +23,7 @@ import {
   INITIAL_GOOGLE_SHEETS_CONFIG
 } from '../data/mockData';
 import { TRANSLATIONS } from '../locales/translations';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export type NavigationPage = 
   | 'dashboard' 
@@ -174,7 +175,161 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return TRANSLATIONS[language]?.[key] || TRANSLATIONS['en']?.[key] || key;
   };
 
-  const login = (email: string, roleName?: string) => {
+  // Live Supabase Integration & Realtime Subscriptions
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    const fetchSupabaseData = async () => {
+      try {
+        // Fetch events
+        const { data: dbEvents, error: eventsError } = await supabase.from('events').select('*').order('created_at', { ascending: false });
+        if (!eventsError && dbEvents && dbEvents.length > 0) {
+          setEvents(dbEvents.map(e => ({
+            id: e.id,
+            eventCode: e.event_code,
+            name: e.title,
+            collegeName: e.college_name,
+            collegeTier: 'Tier 1',
+            location: e.location,
+            city: e.location.split(',')[1]?.trim() || 'Pune',
+            state: 'Maharashtra',
+            date: new Date(e.event_date).toISOString().split('T')[0],
+            startTime: '10:00 AM',
+            endTime: '04:00 PM',
+            venue: e.location,
+            eventType: 'Engineering Outreach',
+            description: e.description || '',
+            contactPerson: { name: 'Faculty Lead', role: 'Coordinator', email: 'coordinator@college.ac.in', phone: '+91 9800000000' },
+            status: e.status === 'Completed' ? 'completed' : e.status === 'Ongoing' ? 'ongoing' : 'active',
+            funnel: {
+              registered: e.registered_count || 0,
+              started: e.started_count || 0,
+              completed: e.completed_count || 0
+            },
+            qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://katalyst.org/register/${e.event_code}`,
+            registrationUrl: `https://katalyst.org/register/${e.event_code}`
+          })));
+        }
+
+        // Fetch leads
+        const { data: dbLeads, error: leadsError } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
+        if (!leadsError && dbLeads && dbLeads.length > 0) {
+          setLeads(dbLeads.map(l => ({
+            id: l.id,
+            trackingId: l.tracking_token,
+            name: l.full_name,
+            email: l.email,
+            phone: l.phone,
+            college: l.college_name,
+            city: 'Pune',
+            state: 'Maharashtra',
+            yearOfStudy: l.academic_year as any || '2nd Year',
+            fieldOfStudy: l.field_of_study,
+            currentGpaOrPercentage: '8.5 CGPA',
+            annualFamilyIncome: '< ₹2,00,000 / annum',
+            eventId: l.event_id || 'evt-1',
+            eventName: l.event_code,
+            eventCode: l.event_code,
+            registrationDate: new Date(l.created_at).toISOString().split('T')[0],
+            registrationTimestamp: new Date(l.created_at).toLocaleString(),
+            applicationStatus: (l.status as ApplicationStatus) || 'Registered',
+            completionPercentage: l.status === 'Completed' ? 100 : l.status === 'Started' ? 50 : 25,
+            consent: {
+              termsAccepted: l.consent_given || false,
+              whatsappUpdates: true,
+              futureCommunications: true,
+              timestamp: new Date(l.created_at).toLocaleString()
+            },
+            timeline: [
+              {
+                id: `tl-${Date.now()}`,
+                timestamp: new Date(l.created_at).toLocaleString(),
+                title: 'Interest Registered',
+                description: `Registered at event ${l.event_code}`,
+                actor: 'Student',
+                statusType: 'Registered'
+              }
+            ]
+          })));
+        }
+      } catch (err) {
+        console.warn('Supabase fetch error, maintaining local state:', err);
+      }
+    };
+
+    fetchSupabaseData();
+
+    // Supabase Realtime channel subscription for leads table
+    const leadsChannel = supabase
+      .channel('realtime-leads-channel')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'leads' },
+        (payload) => {
+          const newLead = payload.new;
+          setLiveToast({
+            show: true,
+            message: '⚡ Live Student Registration!',
+            subtext: `${newLead.full_name} registered for ${newLead.event_code}`
+          });
+          const formattedLead: StudentLead = {
+            id: newLead.id,
+            trackingId: newLead.tracking_token,
+            name: newLead.full_name,
+            email: newLead.email,
+            phone: newLead.phone,
+            college: newLead.college_name,
+            city: 'Pune',
+            state: 'Maharashtra',
+            yearOfStudy: newLead.academic_year as any || '2nd Year',
+            fieldOfStudy: newLead.field_of_study,
+            currentGpaOrPercentage: '8.5 CGPA',
+            annualFamilyIncome: '< ₹2,00,000 / annum',
+            eventId: newLead.event_id || 'evt-1',
+            eventName: newLead.event_code,
+            eventCode: newLead.event_code,
+            registrationDate: new Date(newLead.created_at).toISOString().split('T')[0],
+            registrationTimestamp: new Date(newLead.created_at).toLocaleString(),
+            applicationStatus: (newLead.status as ApplicationStatus) || 'Registered',
+            completionPercentage: 25,
+            consent: {
+              termsAccepted: newLead.consent_given || false,
+              whatsappUpdates: true,
+              futureCommunications: true,
+              timestamp: new Date(newLead.created_at).toLocaleString()
+            },
+            timeline: [
+              {
+                id: `tl-${Date.now()}`,
+                timestamp: new Date(newLead.created_at).toLocaleString(),
+                title: 'Interest Registered',
+                description: `Registered at event ${newLead.event_code}`,
+                actor: 'Student',
+                statusType: 'Registered'
+              }
+            ]
+          };
+          setLeads(prev => [formattedLead, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(leadsChannel);
+    };
+  }, []);
+
+  const login = async (email: string, roleName?: string) => {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.auth.signInWithPassword({
+          email,
+          password: 'KatalystAdmin2026!'
+        });
+      } catch (e) {
+        console.warn('Supabase auth fallback:', e);
+      }
+    }
     const found = adminUsers.find(u => u.email.toLowerCase() === email.toLowerCase()) || {
       id: `usr-${Date.now()}`,
       name: email.split('@')[0].replace('.', ' ').toUpperCase(),
@@ -189,7 +344,10 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setIsAuthenticated(true);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    if (isSupabaseConfigured()) {
+      await supabase.auth.signOut();
+    }
     setIsAuthenticated(false);
     setCurrentUser(null);
   };
@@ -266,7 +424,24 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     setEvents(prev => [newEvent, ...prev]);
     setCreatedEventSuccess(newEvent);
-    
+
+    if (isSupabaseConfigured()) {
+      supabase.from('events').insert({
+        event_code: newEvent.eventCode,
+        title: newEvent.name,
+        college_name: newEvent.collegeName,
+        event_date: new Date(newEvent.date).toISOString(),
+        location: `${newEvent.venue}, ${newEvent.location}`,
+        description: newEvent.description,
+        target_year: 'All STEM Years',
+        field_of_study: 'Engineering & STEM',
+        max_capacity: newEvent.metrics.targetRegistrations,
+        status: 'Upcoming'
+      }).then(({ error }) => {
+        if (error) console.warn('Supabase event insert error:', error);
+      });
+    }
+
     // Add notification
     setNotifications(prev => [
       {
