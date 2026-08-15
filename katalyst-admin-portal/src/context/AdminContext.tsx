@@ -260,62 +260,73 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     fetchSupabaseData();
 
     // Supabase Realtime channel subscription for leads table
-    const leadsChannel = supabase
-      .channel('realtime-leads-channel')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'leads' },
-        (payload) => {
-          const newLead = payload.new;
-          setLiveToast({
-            show: true,
-            message: '⚡ Live Student Registration!',
-            subtext: `${newLead.full_name} registered for ${newLead.event_code}`
-          });
-          const formattedLead: StudentLead = {
-            id: newLead.id,
-            trackingId: newLead.tracking_token,
-            name: newLead.full_name,
-            email: newLead.email,
-            phone: newLead.phone,
-            college: newLead.college_name,
-            city: 'Pune',
-            state: 'Maharashtra',
-            yearOfStudy: newLead.academic_year as any || '2nd Year',
-            fieldOfStudy: newLead.field_of_study,
-            currentGpaOrPercentage: '8.5 CGPA',
-            annualFamilyIncome: '< ₹2,00,000 / annum',
-            eventId: newLead.event_id || 'evt-1',
-            eventName: newLead.event_code,
-            eventCode: newLead.event_code,
-            registrationDate: new Date(newLead.created_at).toISOString().split('T')[0],
-            registrationTimestamp: new Date(newLead.created_at).toLocaleString(),
-            applicationStatus: (newLead.status as ApplicationStatus) || 'Registered',
-            completionPercentage: 25,
-            consent: {
-              termsAccepted: newLead.consent_given || false,
-              whatsappUpdates: true,
-              futureCommunications: true,
-              timestamp: new Date(newLead.created_at).toLocaleString()
-            },
-            timeline: [
-              {
-                id: `tl-${Date.now()}`,
-                timestamp: new Date(newLead.created_at).toLocaleString(),
-                title: 'Interest Registered',
-                description: `Registered at event ${newLead.event_code}`,
-                actor: 'Student',
-                statusType: 'Registered'
-              }
-            ]
-          };
-          setLeads(prev => [formattedLead, ...prev]);
-        }
-      )
-      .subscribe();
+    let leadsChannel: any = null;
+    try {
+      leadsChannel = supabase
+        .channel('realtime-leads-channel')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'leads' },
+          (payload) => {
+            try {
+              const newLead = payload.new;
+              setLiveToast({
+                show: true,
+                message: '⚡ Live Student Registration!',
+                subtext: `${newLead.full_name} registered for ${newLead.event_code}`
+              });
+              const formattedLead: StudentLead = {
+                id: newLead.id,
+                trackingId: newLead.tracking_token,
+                name: newLead.full_name,
+                email: newLead.email,
+                phone: newLead.phone,
+                college: newLead.college_name,
+                city: 'Pune',
+                state: 'Maharashtra',
+                yearOfStudy: newLead.academic_year as any || '2nd Year',
+                fieldOfStudy: newLead.field_of_study,
+                currentGpaOrPercentage: '8.5 CGPA',
+                annualFamilyIncome: '< ₹2,00,000 / annum',
+                eventId: newLead.event_id || 'evt-1',
+                eventName: newLead.event_code,
+                eventCode: newLead.event_code,
+                registrationDate: new Date(newLead.created_at).toISOString().split('T')[0],
+                registrationTimestamp: new Date(newLead.created_at).toLocaleString(),
+                applicationStatus: (newLead.status as ApplicationStatus) || 'Registered',
+                completionPercentage: 25,
+                consent: {
+                  termsAccepted: newLead.consent_given || false,
+                  whatsappUpdates: true,
+                  futureCommunications: true,
+                  timestamp: new Date(newLead.created_at).toLocaleString()
+                },
+                timeline: [
+                  {
+                    id: `tl-${Date.now()}`,
+                    timestamp: new Date(newLead.created_at).toLocaleString(),
+                    title: 'Interest Registered',
+                    description: `Registered at event ${newLead.event_code}`,
+                    actor: 'Student',
+                    statusType: 'Registered'
+                  }
+                ]
+              };
+              setLeads(prev => [formattedLead, ...prev]);
+            } catch (e) {
+              console.warn('Realtime payload handling error:', e);
+            }
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Supabase realtime channel creation warning:', err);
+    }
 
     return () => {
-      supabase.removeChannel(leadsChannel);
+      if (leadsChannel) {
+        try { supabase.removeChannel(leadsChannel); } catch (e) {}
+      }
     };
   }, []);
 

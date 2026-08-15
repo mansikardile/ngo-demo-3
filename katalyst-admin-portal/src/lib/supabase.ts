@@ -8,25 +8,29 @@ export const isSupabaseConfigured = (): boolean => {
   return Boolean(
     supabaseUrl && 
     supabaseAnonKey && 
-    supabaseUrl !== 'https://your-project.supabase.co' && 
-    supabaseAnonKey !== 'your-anon-key'
+    supabaseUrl.startsWith('https://') &&
+    !supabaseUrl.includes('your-project') && 
+    !supabaseAnonKey.includes('your-') &&
+    !supabaseAnonKey.includes('placeholder')
   );
 };
 
-// Create a Supabase client instance if credentials exist, else dummy fallback client
-export const supabase: SupabaseClient = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-anon-key',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 10,
+let client: SupabaseClient;
+try {
+  client = createClient(
+    isSupabaseConfigured() ? supabaseUrl : 'https://placeholder.supabase.co',
+    isSupabaseConfigured() ? supabaseAnonKey : 'placeholder-anon-key',
+    {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
       },
-    },
-  }
-);
+    }
+  );
+} catch (e) {
+  console.warn('Supabase client initialization failed, using dummy fallback:', e);
+  client = createClient('https://placeholder.supabase.co', 'placeholder-anon-key');
+}
+
+export const supabase = client;
